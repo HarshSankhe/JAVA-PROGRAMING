@@ -1,0 +1,178 @@
+package currency_converter;
+
+import javax.swing.*;
+import java.awt.*;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
+import java.awt.event.ItemEvent;
+import java.awt.event.ItemListener;
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.net.HttpURLConnection;  // Import HttpURLConnection class
+import java.net.URL;  // Import URL class
+import org.json.JSONObject;  // Ensure you have this JSON library for parsing JSON
+import org.json.JSONException;
+
+
+
+public class CurrencyConverter extends JFrame {
+    private JTextField inputField;
+    private JComboBox<String> fromCurrency, toCurrency;
+    private JLabel resultLabel, fromFlag, toFlag;
+
+    public CurrencyConverter() {
+        // Create the layout and UI components
+        setTitle("Currency Converter");
+        setLayout(new GridLayout(6, 2)); // Expanded layout for better spacing
+
+        // Get all available currencies dynamically
+        String[] currencies = Codes.getAvailableCurrencies(); 
+
+        // Text field for user input
+        inputField = new JTextField();
+        add(new JLabel("Amount:"));
+        add(inputField);
+
+        // Currency selection combo boxes populated dynamically
+        fromCurrency = new JComboBox<>(currencies);
+        toCurrency = new JComboBox<>(currencies);
+
+        add(new JLabel("From:"));
+        add(fromCurrency);
+        add(new JLabel("To:"));
+        add(toCurrency);
+
+        // Labels to show flags
+        fromFlag = new JLabel();
+        toFlag = new JLabel();
+
+        updateFlag(fromFlag, (String) fromCurrency.getSelectedItem());
+        updateFlag(toFlag, (String) toCurrency.getSelectedItem());
+
+        add(fromFlag);
+        add(toFlag);
+
+        // Button to trigger conversion
+        JButton convertButton = new JButton("Convert");
+        add(convertButton);
+
+        // Result label
+        resultLabel = new JLabel();
+        add(resultLabel);
+
+        // Button action listener
+        convertButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                try {
+                    String from = (String) fromCurrency.getSelectedItem();
+                    String to = (String) toCurrency.getSelectedItem();
+                    double amount = Double.parseDouble(inputField.getText());
+
+                    // Perform conversion and display the result
+                    double result = convertCurrency(amount, from, to);
+                    resultLabel.setText(String.format("Converted Amount: %.2f %s", result, to));
+
+                } catch (NumberFormatException ex) {
+                    JOptionPane.showMessageDialog(null, "Please enter a valid amount.", "Error", JOptionPane.ERROR_MESSAGE);
+                }
+            }
+        });
+
+        // Update flags when currency is selected in the "From" dropdown
+        fromCurrency.addItemListener(new ItemListener() {
+            @Override
+            public void itemStateChanged(ItemEvent e) {
+                if (e.getStateChange() == ItemEvent.SELECTED) {
+                    updateFlag(fromFlag, (String) fromCurrency.getSelectedItem());
+                }
+            }
+        });
+
+        // Update flags when currency is selected in the "To" dropdown
+        toCurrency.addItemListener(new ItemListener() {
+            @Override
+            public void itemStateChanged(ItemEvent e) {
+                if (e.getStateChange() == ItemEvent.SELECTED) {
+                    updateFlag(toFlag, (String) toCurrency.getSelectedItem());
+                }
+            }
+        });
+
+        // Set frame size and other settings
+        setSize(500, 400); // Explicitly set the frame size to avoid a small window
+        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        setVisible(true);
+    }
+
+    // Method to perform currency conversion
+private double convertCurrency(double amount, String from, String to) {
+    try {
+        // Replace with your actual API URL
+        String apiUrl = "https://v6.exchangerate-api.com/v6/e480eb6ca241656e9954c2ea/latest/" + from;
+
+        // Create a URL object
+        URL url = new URL(apiUrl);
+        HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+        conn.setRequestMethod("GET");
+
+        // Check the response code
+        if (conn.getResponseCode() != HttpURLConnection.HTTP_OK) {
+            throw new IOException("Failed to get response from API");
+        }
+
+        // Read the response
+        BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream()));
+        StringBuilder jsonResponse = new StringBuilder();
+        String line;
+        while ((line = reader.readLine()) != null) {
+            jsonResponse.append(line);
+        }
+        reader.close();
+
+        // Parse the JSON response
+        JSONObject jsonObject = new JSONObject(jsonResponse.toString());
+        JSONObject conversionRates = jsonObject.getJSONObject("conversion_rates");  // Note change here
+
+        // Get the conversion rate
+        double conversionRate = conversionRates.getDouble(to);  // Note change here
+
+        // Return the converted amount
+        return amount * conversionRate;
+
+    } catch (Exception e) {
+        e.printStackTrace();
+        return 0; // Handle error or return a default value
+    }
+}
+
+
+
+
+
+
+    // Method to update flags
+    // Method to update flags
+private void updateFlag(JLabel flagLabel, String currencyCode) {
+    try {
+        String countryCode = Codes.getCountryCode(currencyCode);  // Fetch country code from Codes.java
+        String imgSrc = "https://flagsapi.com/" + countryCode + "/flat/64.png"; // Flags API URL
+
+        // Load the flag image
+        ImageIcon flagIcon = new ImageIcon(new URL(imgSrc));  
+        Image img = flagIcon.getImage();  
+        Image scaledImg = img.getScaledInstance(64, 64, Image.SCALE_SMOOTH); // Scale image to proper size
+        flagIcon = new ImageIcon(scaledImg);  
+
+        flagLabel.setIcon(flagIcon); // Update flag icon in the JLabel
+    } catch (Exception e) {
+        e.printStackTrace(); // Handle exceptions
+        flagLabel.setText("Flag not found"); // Display fallback text in case of error
+    }
+}
+
+    public static void main(String[] args) {
+        new CurrencyConverter();
+    }
+}
